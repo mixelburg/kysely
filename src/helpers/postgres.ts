@@ -1,5 +1,8 @@
 import type { Expression } from '../expression/expression.js'
-import type { RawBuilder } from '../raw-builder/raw-builder.js'
+import type {
+  AliasedRawBuilder,
+  RawBuilder,
+} from '../raw-builder/raw-builder.js'
 import { sql } from '../raw-builder/sql.js'
 import type {
   ShallowDehydrateValue,
@@ -226,4 +229,60 @@ export type MergeAction = 'INSERT' | 'UPDATE' | 'DELETE'
  */
 export function mergeAction(): RawBuilder<MergeAction> {
   return sql`merge_action()`
+}
+
+/**
+ * A PostgreSQL helper for creating a `VALUES` list that can be used as a
+ * table-like expression in CTEs or joins. This is useful for batch updates,
+ * upserts, and other operations where you want to join against a set of
+ * values.
+ *
+ * NOTE: This helper is only guaranteed to work with the built-in `PostgresDialect`.
+ *
+ * ### Examples
+ *
+ * ```ts
+ * import { sql } from 'kysely'
+ * import { values } from 'kysely/helpers/postgres'
+ *
+ * // Batch update using a CTE:
+ * const records = [
+ *   { id: 1, price: 200 },
+ *   { id: 2, price: 300 },
+ * ]
+ *
+ * await db
+ *   .with('new_values', () => values(records, 'new_values'))
+ *   .updateTable('pet as p')
+ *   .from('new_values as nv')
+ *   .set({
+ *     price: (eb) => eb.ref('nv.price'),
+ *   })
+ *   .whereRef('p.id', '=', 'nv.id')
+ *   .execute()
+ * ```
+ *
+ * The generated SQL (PostgreSQL):
+ *
+ * ```sql
+ * with "new_values"("id", "price") as
+ *   (values ($1, $2), ($3, $4))
+ * update "pet" as "p"
+ * set "price" = "nv"."price"
+ * from "new_values" as "nv"
+ * where "p"."id" = "nv"."id"
+ * ```
+ */
+export function values<R extends Record<string, unknown>, A extends string>(
+  records: R[],
+  alias: A,
+): AliasedRawBuilder<R, A> {
+  const keys = Object.keys(records[0])
+  const v = sql.join(
+    records.map((r) => sql`(${sql.join(keys.map((k) => r[k]))})`),
+  )
+  const wrappedAlias = sql.ref(alias)
+  const wrappedColumns = sql.join(keys.map(sql.ref))
+  const aliasSql = sql`${wrappedAlias}(${wrappedColumns})`
+  return sql<R>`(values ${v})`.as<A>(aliasSql)
 }

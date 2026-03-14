@@ -2,6 +2,7 @@
   "name": "kysely",
   "version": "0.28.12",
   "description": "Type safe SQL query builder",
+  "sideEffects": false,
   "repository": {
     "type": "git",
     "url": "git://github.com/kysely-org/kysely.git"

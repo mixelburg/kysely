@@ -103,6 +103,7 @@
   },
   "author": "Sami Koskimäki <sami@jakso.me>",
   "license": "MIT",
+  "sideEffects": false,
   "contributors": [
     "Sami Koskimäki <sami@jakso.me>",
     "Igal Klebanov <igalklebanov@gmail.com>"

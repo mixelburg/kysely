@@ -397,3 +397,43 @@ for (const dialect of DIALECTS) {
 function json<T>(obj: T): RawBuilder<T> {
   return sql`${JSON.stringify(obj)}`
 }
+
+// Unit-level test for CamelCasePlugin.canMap extensibility (no DB required).
+describe('CamelCasePlugin: canMap extensibility', () => {
+  it('can override canMap to skip specific columns', async () => {
+    class SelectiveCamelCasePlugin extends CamelCasePlugin {
+      protected override canMap(
+        obj: unknown,
+        key: string,
+      ): obj is Record<string, unknown> {
+        // Never map nested keys inside 'raw_json' columns.
+        if (key === 'rawJson') return false
+        return super.canMap(obj, key)
+      }
+    }
+
+    const plugin = new SelectiveCamelCasePlugin()
+
+    // Simulate transformResult by calling mapRow indirectly via transformResult.
+    const result = await plugin.transformResult({
+      result: {
+        rows: [
+          {
+            first_name: 'Alice',
+            raw_json: { nested_key: 'value' },
+            meta_data: { created_at: '2024-01-01' },
+          },
+        ],
+      },
+      queryId: Symbol(),
+    } as any)
+
+    const [row] = result.rows as any[]
+    // top-level snake_case => camelCase conversion still happens
+    expect(row.firstName).to.equal('Alice')
+    // rawJson column: canMap returns false, so nested keys are preserved as-is
+    expect(row.rawJson).to.eql({ nested_key: 'value' })
+    // metaData column: canMap returns true (default), so nested keys are mapped
+    expect(row.metaData).to.eql({ createdAt: '2024-01-01' })
+  })
+})

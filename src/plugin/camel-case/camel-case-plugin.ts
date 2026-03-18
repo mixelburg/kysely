@@ -154,14 +154,30 @@ export class CamelCasePlugin implements KyselyPlugin {
       let value = row[key]
 
       if (Array.isArray(value)) {
-        value = value.map((it) => (canMap(it, this.opt) ? this.mapRow(it) : it))
-      } else if (canMap(value, this.opt)) {
+        value = value.map((it) =>
+          this.canMap(it, key) ? this.mapRow(it) : it,
+        )
+      } else if (this.canMap(value, key)) {
         value = this.mapRow(value)
       }
 
       obj[this.camelCase(key)] = value
       return obj
     }, {})
+  }
+
+  /**
+   * Returns true if the given value should be recursively mapped.
+   *
+   * Override this method to customise which nested objects get their
+   * keys converted. The `key` parameter is the parent key that holds
+   * the value, which can be used to selectively skip certain columns.
+   *
+   * The default implementation skips mapping when
+   * {@link CamelCasePluginOptions.maintainNestedObjectKeys} is set.
+   */
+  protected canMap(obj: unknown, _key: string): obj is Record<string, unknown> {
+    return isPlainObject(obj) && !this.opt?.maintainNestedObjectKeys
   }
 
   protected snakeCase(str: string): string {
@@ -171,11 +187,4 @@ export class CamelCasePlugin implements KyselyPlugin {
   protected camelCase(str: string): string {
     return this.#camelCase(str)
   }
-}
-
-function canMap(
-  obj: unknown,
-  opt: CamelCasePluginOptions,
-): obj is Record<string, unknown> {
-  return isPlainObject(obj) && !opt?.maintainNestedObjectKeys
 }
